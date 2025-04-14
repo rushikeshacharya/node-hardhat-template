@@ -2,8 +2,7 @@ import express from "express";
 import { ethers } from "ethers";
 import "dotenv/config";
 
-import * as contractJSON from "../hardhat/artifacts/contracts/SimpleStorage.sol/SimpleStorage.json" assert { type: "json" };
-// import * as userJSON from "../contract/User.js";
+import * as contractJSON from "../hardhat/artifacts/contracts/Storage.sol/Storage.json" with { type: "json" };
 
 let contractABI = contractJSON.default.abi;
 let contractBytecode = contractJSON.default.bytecode;
@@ -61,7 +60,10 @@ app.get("/retrieve", async (req, res) => {
     const contractInstance = getContractInstance();
     const result = await contractInstance.retrieve();
     res
-      .json({ msg: "Retrive function called Successfully", result: result.toString() })
+      .json({
+        msg: "Retrive function called Successfully",
+        result: result.toString(),
+      })
       .send();
   } catch (error) {
     console.log("Error while retrive()", error);
