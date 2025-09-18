@@ -2,29 +2,22 @@ import { ethers } from "ethers";
 import "dotenv/config";
 import * as contractJSON from "../../../hardhat/artifacts/contracts/TemperatureLogger.sol/TemperatureLogger.json" with { type: "json" };
 
-const host = process.env.BLOCKCHAIN_HOST;
-const accountPrivateKey = process.env.ACCOUNT_PRIVATE_KEY;
-const contractAddress = process.env.CONTRACT_ADDRESS;
+const RPC = process.env.BLOCKCHAIN_HOST;
+const PRIVATE_KEY = process.env.ACCOUNT_PRIVATE_KEY;
+const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS || ""; // set after deploy
+
+const provider = new ethers.JsonRpcProvider(RPC);
+const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 
 const contractABI = contractJSON.default.abi;
 const contractBytecode = contractJSON.default.bytecode;
 
-const provider = new ethers.JsonRpcProvider(host);
-const wallet = new ethers.Wallet(accountPrivateKey, provider);
+const contractFactory = new ethers.ContractFactory(contractABI, contractBytecode, wallet);
 
-const storageFactory = new ethers.ContractFactory(
-  contractABI,
-  contractBytecode,
-  wallet
-);
-
-const getContractInstance = () => {
-  const userContractInstance = new ethers.Contract(
-    contractAddress,
-    contractABI,
-    provider
-  );
-  return userContractInstance.connect(wallet);
+const getContractInstance = (address = CONTRACT_ADDRESS) => {
+  if (!address) throw new Error("CONTRACT_ADDRESS not set");
+  const contract = new ethers.Contract(address, contractABI, provider);
+  return contract.connect(wallet);
 };
 
-export { storageFactory, getContractInstance };
+export { provider, wallet, contractFactory, getContractInstance };

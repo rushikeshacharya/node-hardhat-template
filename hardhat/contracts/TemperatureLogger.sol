@@ -2,25 +2,21 @@
 pragma solidity ^0.8.24;
 
 contract TemperatureLogger {
-    struct Reading {
-        int256 temperature;
-        string unit; // "C" or "F"
-        string latitude;
-        string longitude;
+    struct ReadingMeta {
+        bytes32 dataHash; // keccak256 of the canonical off-chain JSON
         bool exists;
     }
 
-    // mapping: timestamp => locationHash => Reading
-    mapping(uint256 => mapping(bytes32 => Reading)) private readings;
+    // sensorId => timestamp => ReadingMeta
+    mapping(string => mapping(uint256 => ReadingMeta)) private readings;
 
     address public owner;
 
     event ReadingStored(
+        string indexed sensorId,
         uint256 indexed timestamp,
-        int256 temperature,
-        string unit,
-        string latitude,
-        string longitude
+        bytes32 dataHash,
+        address indexed committer
     );
 
     modifier onlyOwner() {
@@ -32,48 +28,39 @@ contract TemperatureLogger {
         owner = msg.sender;
     }
 
+    /// @notice Store the keccak256 hash of an off-chain reading for a sensor & timestamp
+    /// @dev Prevents overwrite of an existing entry
     function storeReading(
+        string calldata sensorId,
         uint256 timestamp,
-        int256 temperature,
-        string calldata unit,
-        string calldata latitude,
-        string calldata longitude
+        bytes32 dataHash
     ) external onlyOwner {
-        bytes32 locationHash = keccak256(abi.encodePacked(latitude, longitude));
-
-        require(
-            !readings[timestamp][locationHash].exists,
-            "Reading already exists for timestamp+location"
-        );
-
-        readings[timestamp][locationHash] = Reading(
-            temperature,
-            unit,
-            latitude,
-            longitude,
-            true
-        );
-
-        emit ReadingStored(timestamp, temperature, unit, latitude, longitude);
+        require(!readings[sensorId][timestamp].exists, "Already exists");
+        readings[sensorId][timestamp] = ReadingMeta(dataHash, true);
+        emit ReadingStored(sensorId, timestamp, dataHash, msg.sender);
     }
 
-    function getReading(
-        uint256 timestamp,
-        string calldata latitude,
-        string calldata longitude
-    )
-        external
-        view
-        returns (
-            int256 temperature,
-            string memory unit,
-            string memory lat,
-            string memory lon
-        )
-    {
-        bytes32 locationHash = keccak256(abi.encodePacked(latitude, longitude));
-        Reading storage r = readings[timestamp][locationHash];
-        require(r.exists, "No reading found for timestamp+location");
-        return (r.temperature, r.unit, r.latitude, r.longitude);
+    /// @notice Get the stored dataHash for sensor/timestamp
+    function getReadingMeta(
+        string calldata sensorId,
+        uint256 timestamp
+    ) external view returns (bytes32) {
+        require(readings[sensorId][timestamp].exists, "Not found");
+        return readings[sensorId][timestamp].dataHash;
+    }
+
+    /// @notice Check existence without revert
+    function exists(
+        string calldata sensorId,
+        uint256 timestamp
+    ) external view returns (bool) {
+        return readings[sensorId][timestamp].exists;
+    }
+
+    /// @notice Allow ownership transfer if required
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "Zero addr");
+        owner = newOwner;
     }
 }
+
